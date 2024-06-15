@@ -1,0 +1,142 @@
+tosca_definitions_version: tosca_simple_yaml_1_0
+description: >
+  MANO UAT - NS - VNFD-client Left.
+
+
+imports:
+  - etsi_nfv_sol001_vnfd_types.yaml
+
+topology_template:
+
+  node_templates:
+    vnffg_vnf1:
+      type: tosca.nodes.nfv.VNF
+      properties:
+        descriptor_id: beda150f-cbda-4528-aaea-efe89de94cf3
+        provider: Ubiqube internal.
+        product_name: vnffg-vnf1-testing
+        software_version: 1.0.0
+        descriptor_version: 1.0.5
+        flavour_id: flavor01
+        flavour_description: Descr.
+        product_info_name: Scaling demo.
+        product_info_description: product info descr.
+        localization_languages:
+          - en_US
+          - fr_FR
+        default_localization_language: en_US
+        lcm_operations_configuration: # tosca.datatypes.nfv.VnfLcmOperationsConfiguration
+          instantiate: # tosca.datatypes.nfv.VnfInstantiateOperationConfiguration
+          scale: # tosca.datatypes.nfv.VnfScaleOperationConfiguration
+            scaling_by_more_than_one_step_supported: true
+          scale_to_level: # tosca.datatypes.nfv.VnfScaleToLevelOperationConfiguration
+            arbitrary_target_levels_supported: true
+          terminate: # tosca.datatypes.nfv.VnfTerminateOperationConfiguration
+            min_graceful_termination_timeout: 60 s
+            max_recommended_graceful_termination_timeout: 120 s
+          change_ext_connectivity: #tosca.datatypes.nfv.VnfChangeExtConnectivityOperationConfiguration
+        monitoring_parameters: # list tosca.datatypes.nfv.VnfMonitoringParameter
+          mon01:
+            performance_metric: v_disk_usage_peak_vnf
+            collection_period: 1 m
+        vnf_profile: # tosca.datatypes.nfv.VnfProfile
+          instantiation_level: demo
+          min_number_of_instances: 1
+          max_number_of_instances: 10
+      requirements:
+        - virtual_link: cp_mgmt
+        - virtual_link_1: cp_right
+
+    vnfc_left:
+      type: tosca.nodes.nfv.Vdu.Compute
+      name: webserver
+      description: A node.
+      artifacts:
+        cirros:
+          type: tosca.artifacts.nfv.SwImage
+          file: maria.db.image.v1.0.qcow2
+          name: cirros
+          version: '1.0'
+          checksum: 
+            algorithm: sha-512
+            hash: 1b03ca1bc3fafe448b90583c12f367949f8b0e665685979d95b004e48574b953316799e23240f4f739d1b5eb4c4ca24d38fdc6f4f9d8247a2bc64db25d6bbdb2
+          container_format: BARE
+          disk_format: QCOW2
+          min_ram: 8192 MiB
+          size: 2 GB
+          operating_system: Linux
+          supported_virtualisation_environments:
+            - KVM
+      properties:
+        monitoring_parameters: # tosca.datatypes.nfv.VnfMonitoringParameter
+          metric name:
+            performance_metric: v_cpu_usage_mean_vnf
+            collection_period: 60 s
+        vdu_profile:
+          min_number_of_instances: 1
+          max_number_of_instances: 2
+        boot_data:
+          content_or_file_data: # tosca.datatypes.nfv.ContentOrFileData
+            content: |
+             #cloud-config
+             system_info:
+              default_user:
+                name: ubiqube
+                home: /home/ubiqube
+             password: ubiqube
+             chpasswd: { expire: False }
+             ssh_pwauth: True
+             bootcmd:
+             - ip route add 0.0.0.0/0 via 10.88.10.1 metric 3
+             runcmd:
+             - ip route add 0.0.0.0/0 via 10.88.10.1 metric 3
+      capabilities:
+        virtual_compute:
+          virtual_memory: # tosca.datatypes.nfv.VirtualMemory
+            virtual_mem_size: 8 GiB
+          virtual_cpu: # tosca.datatypes.nfv.VirtualCpu
+            cpu_architecture: x86_64
+            num_virtual_cpu: 4
+            virtual_cpu_clock: 3 GHz
+          virtual_local_storage: # list tosca.datatypes.nfv.VirtualBlockStorageData
+            - size_of_storage: 40 GiB
+      requirements:
+        - virtual_storage: block01              
+              
+    block01:
+      type: tosca.nodes.nfv.Vdu.VirtualBlockStorage
+      properties:
+        virtual_block_storage_data:
+          size_of_storage: 40 GiB
+      artifacts:
+        cirros:
+          type: tosca.artifacts.nfv.SwImage
+          file: myFile.qcow2
+          deploy_path: deploy path
+          checksum: 
+            algorithm: sha-512
+            hash: c64f3fa8a41d3ff7c2b38938baca5fb71b8ae3ce6f47a575f74e411c4dbffdcb89ccb34c5de95652f99571d5cf9e0459d1168cc26a751d5172e5a64b5d4c7d1f
+          description: desc
+          repository: repo
+      capabilities:
+        virtual_storage: # tosca.capabilities.nfv.VirtualStorage
+          internal_name: test
+
+
+    cp_mgmt:
+      type: tosca.nodes.nfv.VduCp
+      properties:
+        order: 0
+        vnic_type: normal
+      requirements:
+        - virtual_link: virtual_link
+        - virtual_binding: vnfc_left
+
+    cp_right:
+      type: tosca.nodes.nfv.VduCp
+      properties:
+        order: 1
+        vnic_type: normal
+      requirements:
+        - virtual_link: virtual_link_1
+        - virtual_binding: vnfc_left

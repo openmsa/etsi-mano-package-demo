@@ -1,0 +1,184 @@
+#
+#
+#
+#
+tosca_definitions_version: tosca_simple_yaml_1_0
+description: >
+  Sample NSD for integration testing.
+
+imports:
+  - etsi_nfv_sol001_nsd_types.yaml
+
+
+topology_template:
+  node_templates:
+    sle_vnffg_ns01:
+      type: tosca.nodes.nfv.NS
+      properties:
+        descriptor_id: 5e9cacc6-6674-4a48-8568-0a17ad7a74c8
+        designer: ovi@ubiqube.com
+        version: 0.0.1
+        name: VNFFG NSD demo.
+        invariant_id: 5e9cacc6-6674-4a48-8568-0a17ad7a74c8
+        flavour_id: flavor01
+        ns_profile: # tosca.datatypes.nfv.NsProfile
+          ns_instantiation_level: demo
+          min_number_of_instances: 1
+          max_number_of_instances: 1
+          flavour_id: flavor02
+        service_availability_level: 1
+        priority: 1
+        scale_status: # This is a capabilities not a properties.
+          level1: 1
+      requirements:
+        #- virtual_link: # tosca.nodes.nfv.NsVirtualLink
+
+    vnf_left:
+      type:  tosca.nodes.nfv.VNF
+      properties:
+        flavour_id: flavor01
+        descriptor_id: beda150f-cbda-4528-aaea-efe89de94cf3
+      requirements:
+        - virtual_link: VNF_left_forward_1
+        - virtual_link_1: VNF_left_forward_2
+
+    left_vl:
+      type: tosca.nodes.nfv.NsVirtualLink
+      properties:
+        description: First VL
+        vl_profile: # tosca.datatypes.nfv.NsVlProfile
+          virtual_link_protocol_data: # list of tosca.datatypes.nfv.NsVirtualLinkProtocolData
+            - associated_layer_protocol:
+              l2_protocol_data: # tosca.datatypes.nfv.NsL2ProtocolData
+                name: internal-l2
+                vlan_transparent: false
+                segmentation_id: "0"
+              l3_protocol_data: #tosca.datatypes.nfv.NsL3ProtocolData
+                name: internal-l3
+                ip_version: ipv4
+                cidr: 10.1.0.0/24
+                ip_allocation_pools: # list of tosca.datatypes.nfv.NsIpAllocationPool
+                  - start_ip_address: 10.1.0.5
+                    end_ip_address: 10.1.0.250
+        connectivity_type: # tosca.datatypes.nfv.ConnectivityType
+          layer_protocols:
+            - ipv4
+          flow_pattern: mesh
+        test_access:
+          - test
+
+    VNF_left_forward_1:
+      type: tosca.nodes.nfv.Forwarding
+      requirements:
+        - virtual_link: left_vl
+
+    VNF_left_forward_2:
+      type: tosca.nodes.nfv.Forwarding
+      requirements:
+        - virtual_link: left_vl
+
+    # For VNF_1
+    element_1:  # Port pair? port pair group ?
+      type: tosca.nodes.nfv.NfpPositionElement
+      requirements:
+        - profile_element:
+            node: VNF_left_forward_1
+            capability: VNF_left_forward_1
+        - profile_element:
+            node: VNF_left_forward_2
+            capability: VNF_left_forward_2
+
+    nfp_position_1:
+      type: tosca.nodes.nfv.NfpPosition
+      properties:
+        forwarding_behaviour: lb
+      requirements:
+        - element: element_1 # tosca.nodes.nfv.NfpPositionElement
+
+    nfp_1:
+      type: tosca.nodes.nfv.NFP
+      requirements:
+        - nfp_position: nfp_position_1 # tosca.nodes.nfv.NfpPosition
+
+    forwarding:
+      type: tosca.nodes.nfv.Forwarding
+      requirements:
+        - virtual_link: vl01
+
+  policies:
+    - nfp_rule: # classifier
+        type: tosca.policies.nfv.NfpRule
+        properties:
+          ether_destination_address:
+          ether_source_address:
+          ether_type: ipv4
+          vlan_tag:
+            - srt
+            - str2
+          protocol: TCP
+          dscp:
+          source_port_range: 0 - 22
+          source_ip_address_prefix:
+          destination_ip_address_prefix:
+          extended_criteria: # tosca.datatypes.nfv.Mask
+            - starting_point: 1
+              length: 7
+              value: string
+        targets:
+          - nfp_1 # tosca.nodes.nfv.NFP
+
+  groups:
+    vnffg_1:
+      type: tosca.groups.nfv.VNFFG
+      properties:
+        description: descr
+      members:  [ nfp_1, vnf_left, internal, element_1 ]
+  
+
+policies:
+  ns_scaling_aspect:
+    type: tosca.policies.nfv.NsScalingAspects
+    properties:
+      aspects: # map tosca.datatypes.nfv.NsScalingAspect
+        vnf_left_aspect:
+          name: an another name
+          description: descr
+          ns_scale_levels:
+            1: # map<Integer, tosca.datatypes.nfv.NsLevels> 
+              description: descr
+            2:
+              description: d2
+
+  vnf_left_aspect:
+    type: tosca.policies.nfv.VnfToLevelMapping
+    properties:
+      aspect: vnf_left_aspect
+      number_of_instances: # map<Integer, Integer>
+        1: 1
+        2: 2
+        3: 3
+        4: 4
+    targets:  [ vnf_left ] # [ tosca.nodes.nfv.VNF ]
+
+  ns instantiation_level:
+    type: tosca.policies.nfv.NsInstantiationLevels
+    properties:
+      ns_levels: # map<tosca.datatypes.nfv.NsLevels>
+        level_1:
+          description: descr 1
+        level_2:
+          description: descr 2
+        level_3:
+          description: descr 3
+        level_4:
+          description: descr 4
+
+  vnf_to_inst_level:
+    type: tosca.policies.nfv.VnfToInstantiationLevelMapping
+    properties:
+      number_of_instances: # map<String, Integer>
+        inst_lvl: 5
+        level_2: 2
+    targets: [ vnf_left ] #[ tosca.nodes.nfv.VNF ]
+
+

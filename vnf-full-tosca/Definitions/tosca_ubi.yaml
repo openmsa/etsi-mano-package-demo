@@ -249,7 +249,6 @@ topology_template:
             vdu_mem_requirements:
               read: openstack
             numa_enabled: true
-            vdu_mem_requirements: string
           virtual_cpu: # tosca.datatypes.nfv.VirtualCpu
             cpu_architecture: x86_64
             num_virtual_cpu: 1
